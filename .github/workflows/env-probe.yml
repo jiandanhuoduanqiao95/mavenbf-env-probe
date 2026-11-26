@@ -1,0 +1,45 @@
+name: env-probe
+on:
+  workflow_dispatch:
+
+jobs:
+  bugswarm-pull:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: docker version
+        run: docker version
+
+      - name: pull BugSwarm image (cached + fallback)
+        run: |
+          set +e
+          echo "--- cached ---"
+          /usr/bin/time -f 'cached_seconds=%e' docker pull bugswarm/cached-images:raphw-byte-buddy-101978583
+          echo "cached_exit=$?"
+          docker image inspect bugswarm/cached-images:raphw-byte-buddy-101978583 --format 'cached_size_bytes={{.Size}}' || true
+          echo "--- fallback ---"
+          /usr/bin/time -f 'fallback_seconds=%e' docker pull bugswarm/images:raphw-byte-buddy-101978583
+          echo "fallback_exit=$?"
+          docker image inspect bugswarm/images:raphw-byte-buddy-101978583 --format 'fallback_size_bytes={{.Size}}' || true
+
+  maven-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: maven:3.9-eclipse-temurin-17
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: apache/commons-csv
+          ref: e07e3dfed1a73ed2001ce5ef545651ad3b198685
+
+      - name: mvn package (expected failure)
+        run: |
+          set +e
+          mvn -B -DskipTests package > build.log 2>&1
+          echo "mvn_exit=$?"
+          tail -80 build.log
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maven-build-log
+          path: build.log
