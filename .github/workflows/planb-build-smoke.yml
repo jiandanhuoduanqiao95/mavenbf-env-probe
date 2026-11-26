@@ -1,0 +1,89 @@
+name: planb-build-smoke
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        tag:
+          - konsoletyper-teavm-84626989
+          - gwtbootstrap3-gwtbootstrap3-92837490
+          - brettwooldridge-HikariCP-158059986
+    steps:
+      - name: pull (cached then fallback)
+        run: |
+          set +e
+          echo "--- cached ---"
+          docker pull bugswarm/cached-images:${{ matrix.tag }}
+          c=$?
+          echo "cached_exit=$c"
+          img=""
+          if [ "$c" -eq 0 ]; then
+            img="bugswarm/cached-images:${{ matrix.tag }}"
+            docker image inspect "$img" --format 'cached_size_bytes={{.Size}}' || true
+          else
+            echo "--- fallback ---"
+            docker pull bugswarm/images:${{ matrix.tag }}
+            f=$?
+            echo "fallback_exit=$f"
+            if [ "$f" -eq 0 ]; then
+              img="bugswarm/images:${{ matrix.tag }}"
+              docker image inspect "$img" --format 'fallback_size_bytes={{.Size}}' || true
+            fi
+          fi
+          if [ -z "$img" ]; then
+            echo "PULL_FAILED tag=${{ matrix.tag }}"
+            exit 1
+          fi
+          echo "IMAGE=$img" >> "$GITHUB_ENV"
+
+      - name: run_failed
+        run: |
+          set +e
+          docker run --privileged --rm -i "$IMAGE" /bin/bash -lc 'bash /usr/local/bin/run_failed.sh; echo EXIT=$?' > failed.log 2>&1
+          echo "docker_exit=$?"
+          tail -60 failed.log
+
+      - name: run_passed
+        run: |
+          set +e
+          docker run --privileged --rm -i "$IMAGE" /bin/bash -lc 'bash /usr/local/bin/run_passed.sh; echo EXIT=$?' > passed.log 2>&1
+          echo "docker_exit=$?"
+          tail -60 passed.log
+
+      - name: classify failed.log (literal rules)
+        run: |
+          class=UNKNOWN
+          if grep -qE 'Tests run:|<<< FAILURE!' failed.log; then
+            class=TEST
+          elif grep -qE 'COMPILATION ERROR|Could not resolve dependencies|Non-resolvable parent POM' failed.log; then
+            class=BUILD
+          elif grep -q 'Failed to execute goal' failed.log && ! grep -q 'Tests run:' failed.log; then
+            class=BUILD_OR_PLUGIN
+          elif grep -qE 'Could not transfer|Connection|timeout' failed.log; then
+            class=INFRA
+          fi
+          ev=$(grep -m1 -E 'Tests run:|<<< FAILURE!|COMPILATION ERROR|Could not resolve dependencies|Non-resolvable parent POM|Failed to execute goal|Could not transfer|Connection|timeout' failed.log | head -c 200)
+          fe=$(grep -oE 'EXIT=-?[0-9]+' failed.log | tail -1)
+          pe=$(grep -oE 'EXIT=-?[0-9]+' passed.log | tail -1)
+          echo "tag=${{ matrix.tag }}"
+          echo "class=$class"
+          echo "evidence=$ev"
+          echo "failed_${fe:-EXIT=none}"
+          echo "passed_${pe:-EXIT=none}"
+          echo "CLASS=$class" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: failed-log-${{ matrix.tag }}
+          path: failed.log
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: passed-log-${{ matrix.tag }}
+          path: passed.log
