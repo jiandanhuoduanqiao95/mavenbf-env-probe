@@ -97,7 +97,7 @@ jobs:
             TEST)       ev=$(grep -m1E 'Tests run: [0-9]+, Failures: [1-9]|Tests run: [0-9]+, Failures: 0, Errors: [1-9]' failed.log) ;;
             PLUGIN)     ev=$(grep -m1 'Failed to execute goal org.apache.maven.plugins:maven-' failed.log) ;;
           esac
-          goal=$(grep -m1 -oE 'maven-[a-z0-9.-]+-plugin:[0-9.]+:[a-z-]+' failed.log)
+          goal=$(grep 'Failed to execute goal' failed.log | grep -m1 -oE 'maven-[a-z0-9.-]+-plugin:[0-9.]+:[a-z-]+' )
           fe=$(grep -oE 'EXIT=-?[0-9]+' failed.log | tail -1)
           pe=$(grep -oE 'EXIT=-?[0-9]+' passed.log | tail -1)
           echo "tag=${{ matrix.tag }}"
