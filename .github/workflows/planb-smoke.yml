@@ -1,0 +1,40 @@
+name: planb-smoke
+on:
+  workflow_dispatch:
+
+jobs:
+  failed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: pull
+        run: docker pull bugswarm/cached-images:raphw-byte-buddy-101978583
+      - name: run_failed
+        run: |
+          set +e
+          docker run --privileged --rm -i bugswarm/cached-images:raphw-byte-buddy-101978583 \
+            /bin/bash -lc 'bash /usr/local/bin/run_failed.sh; echo EXIT=$?' > failed.log 2>&1
+          echo "docker_exit=$?"
+          tail -100 failed.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: failed-log
+          path: failed.log
+
+  passed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: pull
+        run: docker pull bugswarm/cached-images:raphw-byte-buddy-101978583
+      - name: run_passed
+        run: |
+          set +e
+          docker run --privileged --rm -i bugswarm/cached-images:raphw-byte-buddy-101978583 \
+            /bin/bash -lc 'bash /usr/local/bin/run_passed.sh; echo EXIT=$?' > passed.log 2>&1
+          echo "docker_exit=$?"
+          tail -100 passed.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: passed-log
+          path: passed.log
