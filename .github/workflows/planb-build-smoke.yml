@@ -11,21 +11,28 @@ jobs:
       max-parallel: 5
       matrix:
         tag:
-          - konsoletyper-teavm-84626989
-          - gwtbootstrap3-gwtbootstrap3-92837483
-          - davidmoten-rxjava-jdbc-82056063
-          - google-auto-101506036
-          - rinde-RinSim-52440884
-          - ImmobilienScout24-deadcode4j-110208142
-          - HubSpot-Baragon-83337307
-          - google-closure-compiler-97793256
-          - raphw-byte-buddy-156948937
-          - ninjaframework-ninja-138562277
-          - lviggiano-owner-140673539
-          - petergeneric-stdlib-151206239
-          - spring-projects-spring-data-jpa-91418411
-          - square-okhttp-45231678
-          - dropwizard-dropwizard-300124027
+          - davidmoten-rxjava-jdbc-82056064
+          - google-auto-101506038
+          - rinde-RinSim-52440886
+          - ImmobilienScout24-deadcode4j-110208143
+          - HubSpot-Baragon-83337306
+          - raphw-byte-buddy-156948934
+          - ninjaframework-ninja-138562278
+          - lviggiano-owner-140673537
+          - spring-projects-spring-data-jpa-91418413
+          - dropwizard-dropwizard-300122046
+          - spring-projects-spring-hateoas-78347612
+          - tananaev-traccar-221926468
+          - swagger-api-swagger-core-232498510
+          - zxing-zxing-128622624
+          - sannies-mp4parser-79111320
+          - apache-commons-lang-226894246
+          - wmixvideo-nfe-134898762
+          - jcabi-jcabi-parent-108732422
+          - vkostyukov-la4j-45918822
+          - igniterealtime-Openfire-316474344
+          - HubSpot-Singularity-464087022
+          - google-closure-compiler-172459863
     steps:
       - name: pull (cached then fallback)
         run: |
@@ -68,7 +75,7 @@ jobs:
           echo "docker_exit=$?"
           tail -60 passed.log
 
-      - name: classify failed.log (priority rules v2)
+      - name: classify failed.log (priority rules v3)
         run: |
           set +e
           fe=$(grep -oE 'EXIT=-?[0-9]+' failed.log | tail -1 | sed 's/EXIT=//')
@@ -76,7 +83,7 @@ jobs:
           goal=""
           if [ "$fe" = "0" ]; then
             class=NOT_REPRODUCED
-          elif [ "$fe" = "2" ] && grep -q 'Your build has been stopped' failed.log && ! grep -q 'BUILD FAILURE' failed.log; then
+          elif [ "$fe" = "2" ] && grep -q 'Your build has been stopped' failed.log; then
             class=ABORTED
           else
             infra=$(grep -E '^\[ERROR\]|^Caused by:' failed.log | grep -cE 'Could not transfer|PKIX|Connection|timeout' || true)
