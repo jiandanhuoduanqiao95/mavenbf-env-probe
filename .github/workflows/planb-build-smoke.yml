@@ -11,28 +11,26 @@ jobs:
       max-parallel: 5
       matrix:
         tag:
-          - davidmoten-rxjava-jdbc-82056064
-          - google-auto-101506038
-          - rinde-RinSim-52440886
-          - ImmobilienScout24-deadcode4j-110208143
-          - HubSpot-Baragon-83337306
-          - raphw-byte-buddy-156948934
-          - ninjaframework-ninja-138562278
-          - lviggiano-owner-140673537
-          - spring-projects-spring-data-jpa-91418413
-          - dropwizard-dropwizard-300122046
-          - spring-projects-spring-hateoas-78347612
-          - tananaev-traccar-221926468
-          - swagger-api-swagger-core-232498510
-          - zxing-zxing-128622624
-          - sannies-mp4parser-79111320
-          - apache-commons-lang-226894246
-          - wmixvideo-nfe-134898762
-          - jcabi-jcabi-parent-108732422
-          - vkostyukov-la4j-45918822
-          - igniterealtime-Openfire-316474344
-          - HubSpot-Singularity-464087022
-          - google-closure-compiler-172459863
+          - spring-projects-spring-hateoas-232784946
+          - zxing-zxing-128622626
+          - google-auto-101506039
+          - HubSpot-Baragon-83048550
+          - HubSpot-Baragon-82788249
+          - HubSpot-Baragon-82788285
+          - HubSpot-Baragon-85178971
+          - HubSpot-Baragon-82788284
+          - HubSpot-Baragon-85178970
+          - HubSpot-Baragon-86911488
+          - HubSpot-Baragon-85178941
+          - HubSpot-Baragon-85178968
+          - HubSpot-Baragon-86911487
+          - HubSpot-Baragon-91888798
+          - HubSpot-Baragon-89270057
+          - HubSpot-Baragon-89269891
+          - HubSpot-Baragon-79521978
+          - HubSpot-Baragon-79521982
+          - HubSpot-Baragon-104701567
+          - HubSpot-Baragon-104701606
     steps:
       - name: pull (cached then fallback)
         run: |
@@ -86,7 +84,7 @@ jobs:
           elif [ "$fe" = "2" ] && grep -q 'Your build has been stopped' failed.log; then
             class=ABORTED
           else
-            infra=$(grep -E '^\[ERROR\]|^Caused by:' failed.log | grep -cE 'Could not transfer|PKIX|Connection|timeout' || true)
+            infra=$(grep -E '^\[ERROR\]|^Caused by:' failed.log | grep -vE '^\[ERROR\][[:space:]]*(symbol:|location:)|^\[ERROR\][[:space:]]*[^ ]*\.java:\[' | grep -cE 'Could not transfer|PKIX|Connection|timeout' || true)
             if [ "$infra" -gt 0 ]; then
               class=INFRA
             elif grep -q 'COMPILATION ERROR' failed.log; then
@@ -116,7 +114,7 @@ jobs:
           case "$class" in
             NOT_REPRODUCED) ev=$(grep 'exited with 0' failed.log | tail -1) ;;
             ABORTED)        ev=$(grep -m1 'Your build has been stopped' failed.log) ;;
-            INFRA)          ev=$(grep -E '^\[ERROR\]|^Caused by:' failed.log | grep -m1E 'Could not transfer|PKIX|Connection|timeout') ;;
+            INFRA)          ev=$(grep -E '^\[ERROR\]|^Caused by:' failed.log | grep -vE '^\[ERROR\][[:space:]]*(symbol:|location:)|^\[ERROR\][[:space:]]*[^ ]*\.java:\[' | grep -m1E 'Could not transfer|PKIX|Connection|timeout') ;;
             COMPILE)        ev=$(grep -m1 'COMPILATION ERROR' failed.log) ;;
             DEPENDENCY)     ev=$(grep -m1E 'Could not resolve dependencies|Non-resolvable parent POM' failed.log) ;;
             TOOLCHAIN)      ev=$(grep -m1E 'UnsupportedClassVersionError|Unsupported major.minor version|invalid target release|No compiler is provided' failed.log) ;;
