@@ -11,26 +11,21 @@ jobs:
       max-parallel: 5
       matrix:
         tag:
-          - HubSpot-Baragon-79521976
-          - HubSpot-Baragon-89270339
-          - HubSpot-Baragon-89269852
-          - HubSpot-Baragon-89270049
-          - HubSpot-Baragon-89269847
-          - HubSpot-Baragon-89270046
-          - HubSpot-Baragon-91888816
-          - HubSpot-Baragon-86911522
-          - HubSpot-Baragon-91888815
-          - HubSpot-Baragon-89270336
-          - HubSpot-Baragon-89269887
-          - HubSpot-Baragon-91888814
-          - HubSpot-Baragon-91888796
-          - HubSpot-Baragon-104701564
-          - HubSpot-Baragon-83048552
-          - HubSpot-Baragon-83337311
-          - raphw-byte-buddy-156948933
-          - sannies-mp4parser-133036862
-          - jcabi-jcabi-parent-108732421
-          - vkostyukov-la4j-45918824
+          - spring-projects-spring-data-jpa-65037695
+          - spring-projects-spring-data-jpa-65037693
+          - spring-projects-spring-data-jpa-65037696
+          - spring-projects-spring-data-jpa-65037694
+          - spring-projects-spring-data-jpa-65037692
+          - spring-projects-spring-data-jpa-91418414
+          - spring-projects-spring-data-jpa-91418416
+          - spring-projects-spring-data-jpa-91418418
+          - spring-projects-spring-data-jpa-91418420
+          - spring-projects-spring-data-jpa-91418410
+          - spring-projects-spring-data-jpa-91418412
+          - HubSpot-Singularity-464087022
+          - sannies-mp4parser-79336477
+          - igniterealtime-Openfire-407050232
+          - igniterealtime-Openfire-407103042
     steps:
       - name: pull (cached then fallback)
         run: |
