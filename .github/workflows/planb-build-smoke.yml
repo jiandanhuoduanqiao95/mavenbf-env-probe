@@ -11,16 +11,21 @@ jobs:
       max-parallel: 5
       matrix:
         tag:
-          - gwtbootstrap3-gwtbootstrap3-92837490
-          - brettwooldridge-HikariCP-158059986
-          - yasserg-crawler4j-265972564
-          - davidmoten-rxjava-jdbc-82056062
-          - joel-costigliola-assertj-core-209468547
-          - raphw-byte-buddy-156948936
-          - google-auto-101506035
-          - rinde-RinSim-52440885
-          - ImmobilienScout24-deadcode4j-110208140
-          - square-okio-201546728
+          - konsoletyper-teavm-84626989
+          - gwtbootstrap3-gwtbootstrap3-92837483
+          - davidmoten-rxjava-jdbc-82056063
+          - google-auto-101506036
+          - rinde-RinSim-52440884
+          - ImmobilienScout24-deadcode4j-110208142
+          - HubSpot-Baragon-83337307
+          - google-closure-compiler-97793256
+          - raphw-byte-buddy-156948937
+          - ninjaframework-ninja-138562277
+          - lviggiano-owner-140673539
+          - petergeneric-stdlib-151206239
+          - spring-projects-spring-data-jpa-91418411
+          - square-okhttp-45231678
+          - dropwizard-dropwizard-300124027
     steps:
       - name: pull (cached then fallback)
         run: |
@@ -63,48 +68,60 @@ jobs:
           echo "docker_exit=$?"
           tail -60 passed.log
 
-      - name: classify failed.log (priority rules, INFRA scoped to error lines)
+      - name: classify failed.log (priority rules v2)
         run: |
           set +e
-          # INFRA: keywords only inside error-context lines ([ERROR]/Caused by:)
-          infra=$(cat failed.log | grep -E '^\[ERROR\]|^Caused by:' | grep -cE 'Could not transfer|PKIX|Connection|timeout' || true)
-          plugin=$(grep -c 'Failed to execute goal org.apache.maven.plugins:maven-' failed.log || true)
-          tool=0
-          grep -qE 'UnsupportedClassVersionError|Unsupported major.minor version|invalid target release|No compiler is provided' failed.log && tool=1
-          testfail=$(grep -E 'Tests run: [0-9]+, Failures: [0-9]+, Errors: [0-9]+' failed.log | awk '{f=0;e=0; for(i=1;i<=NF;i++){if($i=="Failures:")f=$(i+1)+0; if($i=="Errors:")e=$(i+1)+0} if(f>0||e>0){print "y"; exit}}' | wc -l)
-
+          fe=$(grep -oE 'EXIT=-?[0-9]+' failed.log | tail -1 | sed 's/EXIT=//')
           class=UNKNOWN
-          if [ "$infra" -gt 0 ]; then
-            class=INFRA
-          elif grep -q 'COMPILATION ERROR' failed.log; then
-            class=COMPILE
-          elif grep -qE 'Could not resolve dependencies|Non-resolvable parent POM' failed.log; then
-            class=DEPENDENCY
-          elif [ "$tool" -eq 1 ]; then
-            class=TOOLCHAIN
-          elif [ "$testfail" -gt 0 ] && [ "$plugin" -eq 0 ]; then
-            class=TEST
-          elif [ "$plugin" -gt 0 ]; then
-            class=PLUGIN
+          goal=""
+          if [ "$fe" = "0" ]; then
+            class=NOT_REPRODUCED
+          elif [ "$fe" = "2" ] && grep -q 'Your build has been stopped' failed.log && ! grep -q 'BUILD FAILURE' failed.log; then
+            class=ABORTED
+          else
+            infra=$(grep -E '^\[ERROR\]|^Caused by:' failed.log | grep -cE 'Could not transfer|PKIX|Connection|timeout' || true)
+            if [ "$infra" -gt 0 ]; then
+              class=INFRA
+            elif grep -q 'COMPILATION ERROR' failed.log; then
+              class=COMPILE
+            elif grep -qE 'maven-compiler-plugin:[0-9.]+:compile' failed.log && grep -q 'Compilation failure' failed.log; then
+              class=COMPILE
+            elif grep -qE 'Could not resolve dependencies|Non-resolvable parent POM' failed.log; then
+              class=DEPENDENCY
+            elif grep -qE 'UnsupportedClassVersionError|Unsupported major.minor version|invalid target release|No compiler is provided' failed.log; then
+              class=TOOLCHAIN
+            else
+              fcg=$(grep -m1 'Failed to execute goal' failed.log)
+              g=$(printf '%s' "$fcg" | grep -oE 'maven-(surefire|failsafe)-plugin:[0-9.]+:(test|verify)' | head -1)
+              if [ -n "$g" ] && { grep -q 'There are test failures' failed.log || grep -qE 'Tests run: [0-9]+, Failures: [1-9]|Tests run: [0-9]+, Failures: 0, Errors: [1-9]' failed.log; }; then
+                class=TEST
+                goal=$g
+              elif [ -n "$fcg" ]; then
+                goal=$(printf '%s' "$fcg" | grep -oE '[A-Za-z0-9.-]+:[A-Za-z0-9.-]+:[0-9.]+:[a-zA-Z-]+' | head -1)
+                case "$goal" in
+                  *jacoco*:check) class=PLUGIN_QUALITY ;;
+                  *) class=PLUGIN ;;
+                esac
+              fi
+            fi
           fi
-
           ev=""
           case "$class" in
-            INFRA)      ev=$(grep -E '^\[ERROR\]|^Caused by:' failed.log | grep -m1E 'Could not transfer|PKIX|Connection|timeout') ;;
-            COMPILE)    ev=$(grep -m1 'COMPILATION ERROR' failed.log) ;;
-            DEPENDENCY) ev=$(grep -m1E 'Could not resolve dependencies|Non-resolvable parent POM' failed.log) ;;
-            TOOLCHAIN)  ev=$(grep -m1E 'UnsupportedClassVersionError|Unsupported major.minor version|invalid target release|No compiler is provided' failed.log) ;;
-            TEST)       ev=$(grep -m1E 'Tests run: [0-9]+, Failures: [1-9]|Tests run: [0-9]+, Failures: 0, Errors: [1-9]' failed.log) ;;
-            PLUGIN)     ev=$(grep -m1 'Failed to execute goal org.apache.maven.plugins:maven-' failed.log) ;;
+            NOT_REPRODUCED) ev=$(grep 'exited with 0' failed.log | tail -1) ;;
+            ABORTED)        ev=$(grep -m1 'Your build has been stopped' failed.log) ;;
+            INFRA)          ev=$(grep -E '^\[ERROR\]|^Caused by:' failed.log | grep -m1E 'Could not transfer|PKIX|Connection|timeout') ;;
+            COMPILE)        ev=$(grep -m1 'COMPILATION ERROR' failed.log) ;;
+            DEPENDENCY)     ev=$(grep -m1E 'Could not resolve dependencies|Non-resolvable parent POM' failed.log) ;;
+            TOOLCHAIN)      ev=$(grep -m1E 'UnsupportedClassVersionError|Unsupported major.minor version|invalid target release|No compiler is provided' failed.log) ;;
+            TEST)           ev=$(grep -m1 'There are test failures' failed.log) ;;
+            PLUGIN|PLUGIN_QUALITY) ev=$(grep -m1 'Failed to execute goal' failed.log) ;;
           esac
-          goal=$(grep 'Failed to execute goal' failed.log | grep -m1 -oE 'maven-[a-z0-9.-]+-plugin:[0-9.]+:[a-z-]+' )
-          fe=$(grep -oE 'EXIT=-?[0-9]+' failed.log | tail -1)
           pe=$(grep -oE 'EXIT=-?[0-9]+' passed.log | tail -1)
           echo "tag=${{ matrix.tag }}"
           echo "class=$class"
           echo "goal=$goal"
           echo "evidence=$(printf '%s' "$ev" | head -c 200)"
-          echo "failed_${fe:-EXIT=none}"
+          echo "failed_EXIT=${fe:-none}"
           echo "passed_${pe:-EXIT=none}"
 
       - uses: actions/upload-artifact@v4
