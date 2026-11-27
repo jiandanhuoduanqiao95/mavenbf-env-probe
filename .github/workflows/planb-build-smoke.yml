@@ -11,26 +11,26 @@ jobs:
       max-parallel: 5
       matrix:
         tag:
-          - spring-projects-spring-hateoas-232784946
-          - zxing-zxing-128622626
-          - google-auto-101506039
-          - HubSpot-Baragon-83048550
-          - HubSpot-Baragon-82788249
-          - HubSpot-Baragon-82788285
-          - HubSpot-Baragon-85178971
-          - HubSpot-Baragon-82788284
-          - HubSpot-Baragon-85178970
-          - HubSpot-Baragon-86911488
-          - HubSpot-Baragon-85178941
-          - HubSpot-Baragon-85178968
-          - HubSpot-Baragon-86911487
-          - HubSpot-Baragon-91888798
-          - HubSpot-Baragon-89270057
-          - HubSpot-Baragon-89269891
-          - HubSpot-Baragon-79521978
-          - HubSpot-Baragon-79521982
-          - HubSpot-Baragon-104701567
-          - HubSpot-Baragon-104701606
+          - HubSpot-Baragon-79521976
+          - HubSpot-Baragon-89270339
+          - HubSpot-Baragon-89269852
+          - HubSpot-Baragon-89270049
+          - HubSpot-Baragon-89269847
+          - HubSpot-Baragon-89270046
+          - HubSpot-Baragon-91888816
+          - HubSpot-Baragon-86911522
+          - HubSpot-Baragon-91888815
+          - HubSpot-Baragon-89270336
+          - HubSpot-Baragon-89269887
+          - HubSpot-Baragon-91888814
+          - HubSpot-Baragon-91888796
+          - HubSpot-Baragon-104701564
+          - HubSpot-Baragon-83048552
+          - HubSpot-Baragon-83337311
+          - raphw-byte-buddy-156948933
+          - sannies-mp4parser-133036862
+          - jcabi-jcabi-parent-108732421
+          - vkostyukov-la4j-45918824
     steps:
       - name: pull (cached then fallback)
         run: |
