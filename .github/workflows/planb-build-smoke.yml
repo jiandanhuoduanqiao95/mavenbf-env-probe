@@ -11,21 +11,22 @@ jobs:
       max-parallel: 5
       matrix:
         tag:
-          - spring-projects-spring-data-jpa-65037695
-          - spring-projects-spring-data-jpa-65037693
-          - spring-projects-spring-data-jpa-65037696
-          - spring-projects-spring-data-jpa-65037694
-          - spring-projects-spring-data-jpa-65037692
+          - Adobe-Consulting-Services-acs-aem-commons-455708708
+          - Adobe-Consulting-Services-acs-aem-commons-455708721
+          - brianfrankcooper-YCSB-394573389
           - spring-projects-spring-data-jpa-91418414
-          - spring-projects-spring-data-jpa-91418416
-          - spring-projects-spring-data-jpa-91418418
-          - spring-projects-spring-data-jpa-91418420
-          - spring-projects-spring-data-jpa-91418410
-          - spring-projects-spring-data-jpa-91418412
-          - HubSpot-Singularity-464087022
-          - sannies-mp4parser-79336477
-          - igniterealtime-Openfire-407050232
-          - igniterealtime-Openfire-407103042
+          - square-okhttp-444761664
+          - square-okhttp-457770930
+          - HubSpot-Singularity-439729099
+          - google-closure-compiler-79327095
+          - igniterealtime-Openfire-302127000
+          - igniterealtime-Openfire-365059037
+          - raphw-byte-buddy-93361745
+          - Adobe-Consulting-Services-acs-aem-commons-369395859
+          - HubSpot-Baragon-80701890
+          - HubSpot-Baragon-89452860
+          - pmlopes-yoke-116845673
+          - rinde-RinSim-45970006
     steps:
       - name: pull (cached then fallback)
         run: |
