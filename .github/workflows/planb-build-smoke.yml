@@ -11,22 +11,22 @@ jobs:
       max-parallel: 5
       matrix:
         tag:
-          - Adobe-Consulting-Services-acs-aem-commons-455708708
-          - Adobe-Consulting-Services-acs-aem-commons-455708721
-          - brianfrankcooper-YCSB-394573389
-          - spring-projects-spring-data-jpa-91418414
-          - square-okhttp-444761664
-          - square-okhttp-457770930
-          - HubSpot-Singularity-439729099
-          - google-closure-compiler-79327095
-          - igniterealtime-Openfire-302127000
-          - igniterealtime-Openfire-365059037
-          - raphw-byte-buddy-93361745
-          - Adobe-Consulting-Services-acs-aem-commons-369395859
-          - HubSpot-Baragon-80701890
-          - HubSpot-Baragon-89452860
-          - pmlopes-yoke-116845673
-          - rinde-RinSim-45970006
+          - square-okhttp-528014967
+          - twilio-twilio-java-257036174
+          - twilio-twilio-java-257036523
+          - undera-jmeter-plugins-310644016
+          - Adobe-Consulting-Services-acs-aem-commons-374231971
+          - Azure-azure-sdk-for-java-136721922
+          - Flipkart-foxtrot-97843463
+          - HubSpot-Singularity-436704137
+          - NanoHttpd-nanohttpd-63780705
+          - Scout24-deadcode4j-131735009
+          - alibaba-fastjson-618981324
+          - apache-dubbo-416671624
+          - apache-jackrabbit-oak-337535542
+          - graphhopper-graphhopper-221837923
+          - junkdog-artemis-odb-71816517
+          - mybatis-mybatis-3-121933093
     steps:
       - name: pull (cached then fallback)
         run: |
