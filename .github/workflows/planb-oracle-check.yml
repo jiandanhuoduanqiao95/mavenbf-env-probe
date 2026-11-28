@@ -11,19 +11,18 @@ jobs:
       max-parallel: 4
       matrix:
         tag:
-          - HubSpot-Baragon-82788249
-          - HubSpot-Baragon-82788285
-          - google-auto-101506035
-          - google-auto-101506038
-          - igniterealtime-Openfire-316474344
-          - square-okio-201546728
-          - wmixvideo-nfe-134898762
-          - gwtbootstrap3-gwtbootstrap3-92837483
-          - gwtbootstrap3-gwtbootstrap3-92837490
-          - swagger-api-swagger-core-232498510
-          - brettwooldridge-HikariCP-158059986
-          - tananaev-traccar-221926468
-          - vkostyukov-la4j-45918822
+          - Flipkart-foxtrot-97843463
+          - HubSpot-Baragon-80701890
+          - HubSpot-Baragon-89452860
+          - NanoHttpd-nanohttpd-63780705
+          - google-closure-compiler-79327095
+          - igniterealtime-Openfire-302127000
+          - igniterealtime-Openfire-365059037
+          - mybatis-mybatis-3-121933093
+          - pmlopes-yoke-116845673
+          - twilio-twilio-java-250536511
+          - twilio-twilio-java-257036174
+          - twilio-twilio-java-257036523
     env:
       TAG: ${{ matrix.tag }}
     steps:
