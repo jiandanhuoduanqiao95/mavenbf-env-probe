@@ -11,14 +11,22 @@ jobs:
       max-parallel: 5
       matrix:
         tag:
-          - nutzam-nutz-89845306
-          - ontop-ontop-83689235
-          - orbit-orbit-237244974
-          - pgjdbc-pgjdbc-392704645
-          - raphw-byte-buddy-124133318
-          - square-retrofit-81718047
-          - square-wire-68744453
-          - twilio-twilio-java-250536511
+          - HubSpot-Singularity-436705257
+          - ImmobilienScout24-deadcode4j-131735009
+          - apache-commons-lang-372881624
+          - apache-jackrabbit-oak-293747830
+          - gwtbootstrap3-gwtbootstrap3-49499232
+          - mybatis-mybatis-3-117115624
+          - nutzam-nutz-140438299
+          - spring-projects-spring-data-jpa-94336959
+          - square-wire-68917321
+          - zxing-zxing-139981065
+          - joel-costigliola-assertj-core-309871149
+          - junkdog-artemis-odb-72035852
+          - sannies-mp4parser-79847104
+          - square-okio-53590049
+          - vkostyukov-la4j-44960460
+          - Adobe-Consulting-Services-acs-aem-commons-374231980
     steps:
       - name: pull (cached then fallback)
         run: |
