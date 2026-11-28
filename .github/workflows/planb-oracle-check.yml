@@ -1,0 +1,223 @@
+name: planb-oracle-check
+on:
+  workflow_dispatch:
+
+jobs:
+  oracle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        tag:
+          - HubSpot-Baragon-82788249
+          - HubSpot-Baragon-82788285
+          - google-auto-101506035
+          - google-auto-101506038
+          - igniterealtime-Openfire-316474344
+          - square-okio-201546728
+          - wmixvideo-nfe-134898762
+          - gwtbootstrap3-gwtbootstrap3-92837483
+          - gwtbootstrap3-gwtbootstrap3-92837490
+          - swagger-api-swagger-core-232498510
+          - brettwooldridge-HikariCP-158059986
+          - tananaev-traccar-221926468
+          - vkostyukov-la4j-45918822
+    env:
+      TAG: ${{ matrix.tag }}
+    steps:
+      - name: pull (cached then fallback)
+        run: |
+          set +e
+          echo "--- cached ---"
+          docker pull bugswarm/cached-images:${{ matrix.tag }}
+          c=$?
+          echo "cached_exit=$c"
+          img=""
+          if [ "$c" -eq 0 ]; then
+            img="bugswarm/cached-images:${{ matrix.tag }}"
+            docker image inspect "$img" --format 'cached_size_bytes={{.Size}}' || true
+          else
+            echo "--- fallback ---"
+            docker pull bugswarm/images:${{ matrix.tag }}
+            f=$?
+            echo "fallback_exit=$f"
+            if [ "$f" -eq 0 ]; then
+              img="bugswarm/images:${{ matrix.tag }}"
+              docker image inspect "$img" --format 'fallback_size_bytes={{.Size}}' || true
+            fi
+          fi
+          if [ -z "$img" ]; then
+            echo "PULL_FAILED tag=${{ matrix.tag }}"
+            exit 1
+          fi
+          echo "IMAGE=$img" >> "$GITHUB_ENV"
+
+      # (a) before: fresh container, run_failed.sh
+      - name: a-before
+        run: |
+          set +e
+          docker run --privileged --rm -i "$IMAGE" /bin/bash -lc 'bash /usr/local/bin/run_failed.sh; echo EXIT=$?' > before.log 2>&1
+          be=$(grep -oE 'EXIT=-?[0-9]+' before.log | tail -1 | sed 's/EXIT=//')
+          echo "BEFORE_EXIT=${be:-none}" >> "$GITHUB_ENV"
+          echo "before_exit=${be:-none}"
+          tail -5 before.log
+
+      # (b) locate the two trees (fresh container)
+      - name: b-locate
+        run: |
+          set +e
+          docker run --privileged --rm -i "$IMAGE" /bin/bash -lc 'ls -d /home/*/build/failed/*/* /home/*/build/passed/*/* 2>&1' > locate.log 2>&1
+          cat locate.log
+          ft=$(grep -E '^/home/[^/]+/build/failed/[^/]+/[^/]+$' locate.log | wc -l)
+          pt=$(grep -E '^/home/[^/]+/build/passed/[^/]+/[^/]+$' locate.log | wc -l)
+          ftree=$(grep -E '^/home/[^/]+/build/failed/[^/]+/[^/]+$' locate.log | head -1)
+          ptree=$(grep -E '^/home/[^/]+/build/passed/[^/]+/[^/]+$' locate.log | head -1)
+          echo "FAILED_TREE=$ftree" >> "$GITHUB_ENV"
+          echo "PASSED_TREE=$ptree" >> "$GITHUB_ENV"
+          echo "TREES_FAILED_COUNT=$ft" >> "$GITHUB_ENV"
+          echo "TREES_PASSED_COUNT=$pt" >> "$GITHUB_ENV"
+          echo "failed_trees=$ft passed_trees=$pt"
+
+      # (c) diff -> /tmp/oracle.patch inside a named container, docker cp out
+      - name: c-diff
+        run: |
+          set +e
+          docker run -d --privileged --name diffc-"$TAG" "$IMAGE" sleep 1800
+          docker exec diffc-"$TAG" /bin/bash -lc '
+            set +e
+            cd /home/*/build 2>/dev/null
+            if [ $? -ne 0 ]; then echo "DIFF_CD_FAILED=1"; exit 0; fi
+            fp=$(ls -d failed/*/* 2>/dev/null | head -1)
+            pp=$(ls -d passed/*/* 2>/dev/null | head -1)
+            echo "REL_FAILED=$fp"
+            echo "REL_PASSED=$pp"
+            diff -ruN --exclude=target --exclude=.git --exclude=.svn --exclude=.idea --exclude="*.iml" --exclude="*.log" "$fp" "$pp" > /tmp/oracle.patch
+            echo "DIFF_EXIT=$?"
+          ' > diff-exec.log 2>&1
+          cat diff-exec.log
+          docker cp "diffc-$TAG:/tmp/oracle.patch" ./oracle.patch 2>> diff-exec.log || echo "CP_FAILED=1" >> diff-exec.log
+          docker rm -f "diffc-$TAG" >/dev/null 2>&1
+          if [ -f oracle.patch ]; then
+            files=$(grep -c '^+++ ' oracle.patch || true)
+            added=$(grep -cE '^\+[^+]' oracle.patch || true)
+            removed=$(grep -cE '^-[^-]' oracle.patch || true)
+            binary=$(grep -c '^Binary files' oracle.patch || true)
+            size=$(wc -c < oracle.patch)
+          else
+            files=0; added=0; removed=0; binary=0; size=0
+          fi
+          {
+            echo "PATCH_FILES=$files"
+            echo "PATCH_ADDED=$added"
+            echo "PATCH_REMOVED=$removed"
+            echo "PATCH_BINARY=$binary"
+            echo "PATCH_SIZE=$size"
+          } >> "$GITHUB_ENV"
+          echo "files=$files added=$added removed=$removed binary=$binary size=$size"
+
+      # (d) apply in persistent container
+      - name: d-apply
+        run: |
+          set +e
+          docker run -d --privileged --name workc-"$TAG" "$IMAGE" sleep 7200
+          docker cp ./oracle.patch "workc-$TAG:/tmp/oracle.patch" 2>/dev/null || echo "CP_PATCH_FAILED=1"
+          dry_out=$(docker exec "workc-$TAG" /bin/bash -lc '
+            set +e
+            cd /home/*/build/failed/*/* 2>/dev/null
+            if [ $? -ne 0 ]; then echo "APPLY_CD_FAILED=1"; exit 0; fi
+            if command -v patch >/dev/null 2>&1; then
+              echo "TOOL=patch"
+              patch -p3 --dry-run < /tmp/oracle.patch
+              echo "DRY_EXIT=$?"
+            else
+              echo "TOOL=git-apply"
+              git apply -p3 --check /tmp/oracle.patch 2>&1
+              echo "DRY_EXIT=$?"
+            fi
+          ' 2>&1)
+          echo "$dry_out" | tail -8
+          echo "$dry_out" > dry-run.log
+          tool=$(printf '%s' "$dry_out" | grep -oE 'TOOL=[a-z-]+' | head -1 | cut -d= -f2)
+          dry=$(printf '%s' "$dry_out" | grep -oE 'DRY_EXIT=-?[0-9]+' | tail -1 | cut -d= -f2)
+          ap="skipped"
+          if [ "$dry" = "0" ]; then
+            ap_out=$(docker exec "workc-$TAG" /bin/bash -lc '
+              set +e
+              cd /home/*/build/failed/*/* 2>/dev/null
+              if command -v patch >/dev/null 2>&1; then
+                patch -p3 < /tmp/oracle.patch
+                echo "APPLY_EXIT=$?"
+              else
+                git apply -p3 /tmp/oracle.patch 2>&1
+                echo "APPLY_EXIT=$?"
+              fi
+            ' 2>&1)
+            echo "$ap_out" | tail -8
+            echo "$ap_out" > apply.log
+            ap=$(printf '%s' "$ap_out" | grep -oE 'APPLY_EXIT=-?[0-9]+' | tail -1 | cut -d= -f2)
+          fi
+          echo "APPLY_TOOL=${tool:-unknown}" >> "$GITHUB_ENV"
+          echo "DRY_EXIT=${dry:-none}" >> "$GITHUB_ENV"
+          echo "APPLY_EXIT=${ap:-none}" >> "$GITHUB_ENV"
+          echo "tool=$tool dry_exit=$dry apply_exit=$ap"
+
+      # (e) after: same persistent container
+      - name: e-after
+        run: |
+          set +e
+          docker exec "workc-$TAG" /bin/bash -lc 'bash /usr/local/bin/run_failed.sh; echo EXIT=$?' > after.log 2>&1
+          ae=$(grep -oE 'EXIT=-?[0-9]+' after.log | tail -1 | sed 's/EXIT=//')
+          echo "AFTER_EXIT=${ae:-none}" >> "$GITHUB_ENV"
+          echo "after_exit=${ae:-none}"
+          tail -5 after.log
+
+      - name: result
+        if: always()
+        run: |
+          set +e
+          {
+            echo "tag=$TAG"
+            echo "image=$IMAGE"
+            echo "before_exit=${BEFORE_EXIT:-none}"
+            echo "trees_failed_count=${TREES_FAILED_COUNT:-none}"
+            echo "trees_passed_count=${TREES_PASSED_COUNT:-none}"
+            echo "failed_tree=${FAILED_TREE:-none}"
+            echo "passed_tree=${PASSED_TREE:-none}"
+            echo "diff_exit=$(grep -oE 'DIFF_EXIT=-?[0-9]+' diff-exec.log 2>/dev/null | tail -1)"
+            echo "diff_cd_failed=$(grep -oE 'DIFF_CD_FAILED=[0-9]' diff-exec.log 2>/dev/null | tail -1)"
+            echo "patch_files=${PATCH_FILES:-none}"
+            echo "patch_added=${PATCH_ADDED:-none}"
+            echo "patch_removed=${PATCH_REMOVED:-none}"
+            echo "patch_binary=${PATCH_BINARY:-none}"
+            echo "patch_size=${PATCH_SIZE:-none}"
+            echo "apply_tool=${APPLY_TOOL:-none}"
+            echo "dry_exit=${DRY_EXIT:-none}"
+            echo "apply_exit=${APPLY_EXIT:-none}"
+            echo "after_exit=${AFTER_EXIT:-none}"
+          } > result.txt
+          cat result.txt
+
+      - name: cleanup containers
+        if: always()
+        run: |
+          docker rm -f "diffc-$TAG" >/dev/null 2>&1 || true
+          docker rm -f "workc-$TAG" >/dev/null 2>&1 || true
+
+      - name: upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oracle-${{ matrix.tag }}
+          path: |
+            before.log
+            locate.log
+            dry-run.log
+            apply.log
+            diff-exec.log
+            oracle.patch
+            after.log
+            result.txt
+          if-no-files-found: warn
+          include-hidden-files: false
