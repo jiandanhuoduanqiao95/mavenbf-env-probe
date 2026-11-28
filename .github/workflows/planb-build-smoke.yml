@@ -11,22 +11,14 @@ jobs:
       max-parallel: 5
       matrix:
         tag:
-          - square-okhttp-528014967
-          - twilio-twilio-java-257036174
-          - twilio-twilio-java-257036523
-          - undera-jmeter-plugins-310644016
-          - Adobe-Consulting-Services-acs-aem-commons-374231971
-          - Azure-azure-sdk-for-java-136721922
-          - Flipkart-foxtrot-97843463
-          - HubSpot-Singularity-436704137
-          - NanoHttpd-nanohttpd-63780705
-          - Scout24-deadcode4j-131735009
-          - alibaba-fastjson-618981324
-          - apache-dubbo-416671624
-          - apache-jackrabbit-oak-337535542
-          - graphhopper-graphhopper-221837923
-          - junkdog-artemis-odb-71816517
-          - mybatis-mybatis-3-121933093
+          - nutzam-nutz-89845306
+          - ontop-ontop-83689235
+          - orbit-orbit-237244974
+          - pgjdbc-pgjdbc-392704645
+          - raphw-byte-buddy-124133318
+          - square-retrofit-81718047
+          - square-wire-68744453
+          - twilio-twilio-java-250536511
     steps:
       - name: pull (cached then fallback)
         run: |
