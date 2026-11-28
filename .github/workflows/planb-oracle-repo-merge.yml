@@ -1,0 +1,198 @@
+name: planb-oracle-repo-merge
+on:
+  workflow_dispatch:
+
+jobs:
+  rcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        tag:
+          - igniterealtime-Openfire-302127000
+    env:
+      TAG: ${{ matrix.tag }}
+    steps:
+      - name: pull (cached then fallback)
+        run: |
+          set +e
+          echo "--- cached ---"
+          docker pull bugswarm/cached-images:${{ matrix.tag }}
+          c=$?
+          echo "cached_exit=$c"
+          img=""
+          if [ "$c" -eq 0 ]; then
+            img="bugswarm/cached-images:${{ matrix.tag }}"
+            docker image inspect "$img" --format 'cached_size_bytes={{.Size}}' || true
+          else
+            echo "--- fallback ---"
+            docker pull bugswarm/images:${{ matrix.tag }}
+            f=$?
+            echo "fallback_exit=$f"
+            if [ "$f" -eq 0 ]; then
+              img="bugswarm/images:${{ matrix.tag }}"
+              docker image inspect "$img" --format 'fallback_size_bytes={{.Size}}' || true
+            fi
+          fi
+          if [ -z "$img" ]; then
+            echo "PULL_FAILED tag=${{ matrix.tag }}"
+            exit 1
+          fi
+          echo "IMAGE=$img" >> "$GITHUB_ENV"
+
+      - name: start container
+        run: |
+          docker run -d --privileged --name rcheck "$IMAGE" sleep 7200
+          docker ps --filter name=rcheck
+
+      - name: diag (read-only)
+        run: |
+          set +e
+          docker exec rcheck /bin/bash -lc 'for h in /home/*; do echo "== $h/.m2"; ls -la "$h/.m2" 2>&1 | head -20; done; echo "== local-repo related lines in scripts"; grep -n -E "maven.repo.local|\.m2|MAVEN_OPTS|MAVEN_ARGS|settings" /usr/local/bin/run_failed.sh /usr/local/bin/run_passed.sh 2>&1 | head -60' > diag.log 2>&1
+          cat diag.log
+
+      - name: oracle.patch
+        run: |
+          set +e
+          docker exec rcheck /bin/bash -lc '
+            set +e
+            cd /home/*/build 2>/dev/null
+            if [ $? -ne 0 ]; then echo "DIFF_CD_FAILED=1"; exit 0; fi
+            fp=failed/igniterealtime/Openfire
+            pp=passed/igniterealtime/Openfire
+            ls -d "$fp" "$pp" || { echo "TREES_NOT_FOUND"; exit 0; }
+            diff -ruN --exclude=target --exclude=.git --exclude=.svn --exclude=.idea --exclude="*.iml" --exclude="*.log" "$fp" "$pp" > /tmp/oracle.patch
+            echo "DIFF_EXIT=$?"
+          ' > diff-exec.log 2>&1
+          cat diff-exec.log
+          docker cp rcheck:/tmp/oracle.patch ./oracle.patch 2>>diff-exec.log || echo "CP_FAILED=1" >> diff-exec.log
+          ls -la oracle.patch || true
+
+      - name: apply
+        run: |
+          set +e
+          docker cp ./oracle.patch rcheck:/tmp/oracle.patch 2>/dev/null || echo "CP_PATCH_FAILED=1"
+          dry_out=$(docker exec rcheck /bin/bash -lc '
+            set +e
+            cd /home/travis/build/failed/igniterealtime/Openfire 2>/dev/null
+            if [ $? -ne 0 ]; then echo "APPLY_CD_FAILED=1"; exit 0; fi
+            if command -v patch >/dev/null 2>&1; then
+              echo "TOOL=patch"
+              patch -p3 --dry-run < /tmp/oracle.patch
+              echo "DRY_EXIT=$?"
+            else
+              echo "TOOL=git-apply"
+              git apply -p3 --check /tmp/oracle.patch 2>&1
+              echo "DRY_EXIT=$?"
+            fi
+          ' 2>&1)
+          echo "$dry_out" | tail -8
+          echo "$dry_out" > dry-run.log
+          tool=$(printf '%s' "$dry_out" | grep -a -oE 'TOOL=[a-z-]+' | head -1 | cut -d= -f2)
+          dry=$(printf '%s' "$dry_out" | grep -a -oE 'DRY_EXIT=-?[0-9]+' | tail -1 | cut -d= -f2)
+          ap="skipped"
+          if [ "$dry" = "0" ]; then
+            ap_out=$(docker exec rcheck /bin/bash -lc '
+              set +e
+              cd /home/travis/build/failed/igniterealtime/Openfire 2>/dev/null
+              if command -v patch >/dev/null 2>&1; then
+                patch -p3 < /tmp/oracle.patch
+                echo "APPLY_EXIT=$?"
+              else
+                git apply -p3 /tmp/oracle.patch 2>&1
+                echo "APPLY_EXIT=$?"
+              fi
+            ' 2>&1)
+            echo "$ap_out" | tail -8
+            echo "$ap_out" > apply.log
+            ap=$(printf '%s' "$ap_out" | grep -a -oE 'APPLY_EXIT=-?[0-9]+' | tail -1 | cut -d= -f2)
+          fi
+          echo "APPLY_TOOL=${tool:-unknown}" >> "$GITHUB_ENV"
+          echo "DRY_EXIT=${dry:-none}" >> "$GITHUB_ENV"
+          echo "APPLY_EXIT=${ap:-none}" >> "$GITHUB_ENV"
+          echo "tool=$tool dry_exit=$dry apply_exit=$ap"
+
+      - name: merge .m2 passed -> failed
+        run: |
+          set +e
+          docker exec rcheck /bin/bash -lc '
+            set +e
+            SRC=$(ls -d /home/*/.m2/passed 2>/dev/null | head -1)
+            DST=$(ls -d /home/*/.m2/failed 2>/dev/null | head -1)
+            if [ -z "$SRC" ] || [ -z "$DST" ]; then
+              echo "REPO_DIRS_NOT_FOUND passed=[$SRC] failed=[$DST]"
+              echo "--- available .m2 contents ---"
+              for h in /home/*; do echo "== $h/.m2"; ls -la "$h/.m2" 2>&1 | head -10; done
+              exit 3
+            fi
+            echo "SRC=$SRC"
+            echo "DST=$DST"
+            ls -d "$SRC" "$DST" || { echo REPO_DIRS_NOT_FOUND; exit 3; }
+            du -sh "$SRC" "$DST"
+            cp -an "$SRC/." "$DST/"
+            echo "CP_EXIT=$?"
+            du -sh "$DST"
+          ' > merge.log 2>&1
+          cat merge.log
+          cpe=$(grep -a -oE 'CP_EXIT=-?[0-9]+' merge.log | tail -1 | cut -d= -f2)
+          echo "CP_EXIT=${cpe:-none}" >> "$GITHUB_ENV"
+
+      - name: after (patched + merged)
+        run: |
+          set +e
+          docker exec rcheck /bin/bash -lc 'bash /usr/local/bin/run_failed.sh; echo EXIT=$?' > after_merge.log 2>&1
+          ae=$(grep -a -oE 'EXIT=-?[0-9]+' after_merge.log | tail -1 | sed 's/EXIT=//')
+          echo "AFTER_EXIT=${ae:-none}" >> "$GITHUB_ENV"
+          dn=$(grep -a -c 'Downloading:' after_merge.log || true)
+          dd=$(grep -a -c 'Downloaded:' after_merge.log || true)
+          echo "DL_COUNT=$dn" >> "$GITHUB_ENV"
+          echo "DLDED_COUNT=$dd" >> "$GITHUB_ENV"
+          echo "after_exit=${ae:-none} Downloading=$dn Downloaded=$dd"
+          grep -a -c 'Downloading:' after_merge.log
+          grep -a -c 'Downloaded:' after_merge.log
+          tail -5 after_merge.log
+
+      - name: result
+        if: always()
+        run: |
+          set +e
+          {
+            echo "tag=$TAG"
+            echo "image=$IMAGE"
+            echo "before_exit=(not run in this workflow; see task Q/S logs)"
+            echo "dry_exit=${DRY_EXIT:-none}"
+            echo "apply_exit=${APPLY_EXIT:-none}"
+            echo "apply_tool=${APPLY_TOOL:-none}"
+            echo "cp_exit=${CP_EXIT:-none}"
+            echo "after_exit=${AFTER_EXIT:-none}"
+            echo "downloading_count=${DL_COUNT:-none}"
+            echo "downloaded_count=${DLDED_COUNT:-none}"
+            echo "diff_exit=$(grep -a -oE 'DIFF_EXIT=-?[0-9]+' diff-exec.log 2>/dev/null | tail -1)"
+            echo "repo_dirs_found=$(grep -a -c 'REPO_DIRS_NOT_FOUND' merge.log 2>/dev/null)"
+            echo "merge_log_head=$(head -3 merge.log 2>/dev/null | tr '\n' ' ')"
+          } > result.txt
+          cat result.txt
+
+      - name: cleanup container
+        if: always()
+        run: |
+          docker rm -f rcheck >/dev/null 2>&1 || true
+
+      - name: upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oracle-repo-merge-${{ matrix.tag }}
+          path: |
+            diag.log
+            diff-exec.log
+            oracle.patch
+            dry-run.log
+            apply.log
+            merge.log
+            after_merge.log
+            result.txt
+          if-no-files-found: warn
+          include-hidden-files: false
