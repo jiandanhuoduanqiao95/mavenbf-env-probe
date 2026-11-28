@@ -11,22 +11,22 @@ jobs:
       max-parallel: 5
       matrix:
         tag:
-          - davidmoten-rxjava-jdbc-65230624
-          - square-retrofit-105591966
-          - swagger-api-swagger-core-231706520
-          - twilio-twilio-java-266079628
-          - wmixvideo-nfe-126494335
-          - Azure-azure-sdk-for-java-134840154
-          - HubSpot-Baragon-79555888
-          - raphw-byte-buddy-86826620
-          - pgjdbc-pgjdbc-117659967
-          - rinde-RinSim-45948364
-          - square-okhttp-45582449
-          - petergeneric-stdlib-151852759
-          - tananaev-traccar-64783123
-          - joel-costigliola-assertj-core-322788384
-          - junkdog-artemis-odb-80146605
-          - sannies-mp4parser-110354895
+          - square-okio-65096594
+          - vkostyukov-la4j-45524421
+          - Adobe-Consulting-Services-acs-aem-commons-439308122
+          - davidmoten-rxjava-jdbc-65364623
+          - square-retrofit-201300817
+          - swagger-api-swagger-core-245823910
+          - twilio-twilio-java-266079633
+          - wmixvideo-nfe-128705455
+          - Azure-azure-sdk-for-java-137945691
+          - HubSpot-Baragon-84298249
+          - raphw-byte-buddy-146248651
+          - pgjdbc-pgjdbc-117659978
+          - rinde-RinSim-46165516
+          - square-okhttp-72502537
+          - petergeneric-stdlib-153529639
+          - tananaev-traccar-94037390
     steps:
       - name: pull (cached then fallback)
         run: |
